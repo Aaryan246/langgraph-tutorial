@@ -20,6 +20,7 @@ dependencies = [
     "langgraph>=1.2.20",
     "pytest>=9.2.0",
     "python-dotenv>=1.2.4",
+    "unstructured>=0.27.37",
 ]
 
 [project.scripts]
