@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-llm = ChatOllama(model="gemma4:e4b")
+llm = ChatOllama(model="gemma4:e4b", num_ctx=16384)
 
 prompt = ChatPromptTemplate.from_messages(
     [

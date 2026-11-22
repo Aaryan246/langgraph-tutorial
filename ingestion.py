@@ -26,6 +26,10 @@ text_splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
 
 doc_splits = text_splitter.split_documents(doc_list)
 
+for doc in doc_splits:
+    doc.metadata.pop("orig_elements", None)
+
+
 embeddings = OllamaEmbeddings(model="qwen3-embedding:4b")
 
 # Uncomment when creating vector store for first time

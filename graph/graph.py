@@ -5,6 +5,8 @@ from langgraph.graph import END, StateGraph
 from graph.const import RETRIEVE, GENERATE, GRADE_DOCUMENTS, WEBSEARCH
 from graph.nodes import retrieve, generate, grade_documents, web_search
 from graph.state import GraphState
+from graph.chains.answer_grader import answer_grader
+from graph.chains.hallucination_grader import hallucination_grader
 
 load_dotenv()
 
@@ -22,6 +24,31 @@ def decide_to_generate(state):
         return GENERATE
 
 
+def grade_generation_grounded_in_documents_and_question(state: GraphState) -> str:
+    print("---CHECK HALLUCINATIONS---")
+    question = state["question"]
+    documents = state["documents"]
+    generation = state["generation"]
+
+    score = hallucination_grader.invoke(
+        {"documents": documents, "generation": generation}
+    )
+
+    if hallucination_grade := score.binary_score:
+        print("---DECISION: GENERATION IS GROUNDED IN DOCUMENTS---")
+        print("---GRADE GENERATION vs QUESTION---")
+        score = answer_grader.invoke({"question": question, "generation": generation})
+        if answer_grade := score.binary_score:
+            print("---DECISION: GENERATION ADDRESSES QUESTION---")
+            return "useful"
+        else:
+            print("---DECISION: GENERATION DOES NOT ADDRESS QUESTION---")
+            return "not useful"
+    else:
+        print("---DECISION: GENERATION IS NOT GROUNDED IN DOCUMENTS, RE-TRY---")
+        return "not supported"
+
+
 workflow = StateGraph(GraphState)
 
 workflow.add_node(RETRIEVE, retrieve)
@@ -35,9 +62,19 @@ workflow.add_conditional_edges(
     GRADE_DOCUMENTS, decide_to_generate, {WEBSEARCH: WEBSEARCH, GENERATE: GENERATE}
 )
 
+workflow.add_conditional_edges(
+    GENERATE,
+    grade_generation_grounded_in_documents_and_question,
+    {
+        "not supported": GENERATE,
+        "useful": END,
+        "not useful": WEBSEARCH,
+    },
+)
+
 workflow.add_edge(WEBSEARCH, GENERATE)
 workflow.add_edge(GENERATE, END)
 
 app = workflow.compile()
 
-app.get_graph().draw_mermaid_png(output_file_path="agentic_rag.png")
+app.get_graph().draw_mermaid_png(output_file_path="agentic_corrective_rag.png")
